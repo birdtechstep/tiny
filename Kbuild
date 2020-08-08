@@ -8,3 +8,4 @@ obj-m	+= mi0283qt.o
 obj-m	+= repaper.o
 obj-m	+= st7586.o
 obj-m	+= st7735r.o
+obj-m	+= lh154t.o
