@@ -9,3 +9,4 @@ obj-m	+= repaper.o
 obj-m	+= st7586.o
 obj-m	+= st7735r.o
 obj-m	+= lh154t.o
+obj-m	+= yt400s006.o
