@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * DRM driver for 1.54" TFT LCD DISPLAY ST7796S 40 PIN [YT400S006] panels
+ * DRM driver for 4.0" TFT LCD DISPLAY ST7796S 40 PIN [YT400S006] panels
  *
  * Copyright 2020 BIRD TECHSTEP
  */
