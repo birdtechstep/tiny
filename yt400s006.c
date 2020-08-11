@@ -188,7 +188,7 @@ static const struct drm_simple_display_pipe_funcs yt400s006_pipe_funcs = {
 };
 
 static const struct drm_display_mode yt400s006_mode = {
-	DRM_SIMPLE_MODE(240, 240, 27, 27),
+	DRM_SIMPLE_MODE(320, 480, 55, 83),
 };
 
 DEFINE_DRM_GEM_CMA_FOPS(yt400s006_fops);
