@@ -49,22 +49,22 @@
                                 spi-max-frequency = <128000000>;
 
                                 rotation = <0>;
-				reset-gpios = <&gpio 25 0>;
+								reset-gpios = <&gpio 25 0>;
                                 dc-gpios = <&gpio 24 0>;
                                 backlight = <&backlight>;
                         };
 						
-            		pitft_ts: pitft-ts@1 {
-				compatible = "ti,ads7846";
-				reg = <1>;
+            			pitft_ts: pitft-ts@1 {
+          			    		compatible = "ti,ads7846";
+          			    		reg = <1>;
 
-				spi-max-frequency = <2000000>;
-				interrupts = <17 2>; /* high-to-low edge triggered */
-				interrupt-parent = <&gpio>;
-				pendown-gpio = <&gpio 17 0>;
-				ti,x-plate-ohms = /bits/ 16 <60>;
-				ti,pressure-max = /bits/ 16 <255>;
-			};
+           						spi-max-frequency = <2000000>;
+			                  	interrupts = <17 2>; /* high-to-low edge triggered */
+		        				interrupt-parent = <&gpio>;
+               					pendown-gpio = <&gpio 17 0>;
+           						ti,x-plate-ohms = /bits/ 16 <60>;
+               					ti,pressure-max = /bits/ 16 <255>;
+           				};
                 };
         };
 	

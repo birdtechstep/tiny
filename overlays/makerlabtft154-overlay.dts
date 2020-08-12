@@ -41,7 +41,7 @@
                         #size-cells = <0>;
 
                         pitft: pitft@0{
-                                compatible = "makerlab,lh154t";
+                                compatible = "sitronix,st7789v";
                                 pinctrl-names = "default";
                                 pinctrl-0 = <&pitft_pins>;
 

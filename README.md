@@ -1,5 +1,6 @@
 # tiny display
 tiny (start kernel 5.4-y)
+
 linux drivers gpu drm tiny
 
 ## Out-of-tree tiny modules
@@ -27,7 +28,7 @@ git clone https://github.com/birdtechstep/tiny.git
 cd tiny
 make
 
-sudo cp *.ko /lib/modules/`uname -r`/kernel/drivers/gpu/drm/tiny/
+sudo cp [your_tiny].ko /lib/modules/`uname -r`/kernel/drivers/gpu/drm/tiny/
 sudo depmod
 ~~~~
 
