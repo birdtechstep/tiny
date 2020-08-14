@@ -7,6 +7,7 @@
 
 #include <linux/backlight.h>
 #include <linux/delay.h>
+#include <linux/dma-buf.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/property.h>
@@ -22,30 +23,136 @@
 #include <drm/drm_modeset_helper.h>
 #include <video/mipi_display.h>
 
-#define ILI9488_FRMCTR1		0xb1
-#define ILI9488_DISCTRL		0xb6
-#define ILI9488_ETMOD		0xb7
+#include <drm/drm_damage_helper.h>
+#include <drm/drm_fb_cma_helper.h>
+#include <drm/drm_format_helper.h>
+#include <drm/drm_rect.h>
+#include <drm/drm_vblank.h>
+#include <drm/drm_fourcc.h>
 
-#define ILI9488_PWCTRL1		0xc0
-#define ILI9488_PWCTRL2		0xc1
-#define ILI9488_VMCTRL1		0xc5
-#define ILI9488_VMCTRL2		0xc7
-#define ILI9488_PWCTRLA		0xcb
-#define ILI9488_PWCTRLB		0xcf
+#define ILI9488_CMD_NOP					0x00
+#define ILI9488_CMD_SOFTWARE_RESET			0x01
+#define ILI9488_CMD_READ_DISP_ID			0x04
+#define ILI9488_CMD_READ_ERROR_DSI			0x05
+#define ILI9488_CMD_READ_DISP_STATUS			0x09
+#define ILI9488_CMD_READ_DISP_POWER_MODE		0x0A
+#define ILI9488_CMD_READ_DISP_MADCTRL			0x0B
+#define ILI9488_CMD_READ_DISP_PIXEL_FORMAT		0x0C
+#define ILI9488_CMD_READ_DISP_IMAGE_MODE		0x0D
+#define ILI9488_CMD_READ_DISP_SIGNAL_MODE		0x0E
+#define ILI9488_CMD_READ_DISP_SELF_DIAGNOSTIC		0x0F
+#define ILI9488_CMD_ENTER_SLEEP_MODE			0x10
+#define ILI9488_CMD_SLEEP_OUT				0x11
+#define ILI9488_CMD_PARTIAL_MODE_ON			0x12
+#define ILI9488_CMD_NORMAL_DISP_MODE_ON			0x13
+#define ILI9488_CMD_DISP_INVERSION_OFF			0x20
+#define ILI9488_CMD_DISP_INVERSION_ON			0x21
+#define ILI9488_CMD_PIXEL_OFF				0x22
+#define ILI9488_CMD_PIXEL_ON				0x23
+#define ILI9488_CMD_DISPLAY_OFF				0x28
+#define ILI9488_CMD_DISPLAY_ON				0x29
+#define ILI9488_CMD_COLUMN_ADDRESS_SET			0x2A
+#define ILI9488_CMD_PAGE_ADDRESS_SET			0x2B
+#define ILI9488_CMD_MEMORY_WRITE			0x2C
+#define ILI9488_CMD_MEMORY_READ				0x2E
+#define ILI9488_CMD_PARTIAL_AREA			0x30
+#define ILI9488_CMD_VERT_SCROLL_DEFINITION		0x33
+#define ILI9488_CMD_TEARING_EFFECT_LINE_OFF		0x34
+#define ILI9488_CMD_TEARING_EFFECT_LINE_ON		0x35
+#define ILI9488_CMD_MEMORY_ACCESS_CONTROL		0x36
+#define ILI9488_CMD_VERT_SCROLL_START_ADDRESS		0x37
+#define ILI9488_CMD_IDLE_MODE_OFF			0x38
+#define ILI9488_CMD_IDLE_MODE_ON			0x39
+#define ILI9488_CMD_COLMOD_PIXEL_FORMAT_SET		0x3A
+#define ILI9488_CMD_WRITE_MEMORY_CONTINUE		0x3C
+#define ILI9488_CMD_READ_MEMORY_CONTINUE		0x3E
+#define ILI9488_CMD_SET_TEAR_SCANLINE			0x44
+#define ILI9488_CMD_GET_SCANLINE			0x45
+#define ILI9488_CMD_WRITE_DISPLAY_BRIGHTNESS		0x51
+#define ILI9488_CMD_READ_DISPLAY_BRIGHTNESS		0x52
+#define ILI9488_CMD_WRITE_CTRL_DISPLAY			0x53
+#define ILI9488_CMD_READ_CTRL_DISPLAY			0x54
+#define ILI9488_CMD_WRITE_CONTENT_ADAPT_BRIGHTNESS	0x55
+#define ILI9488_CMD_READ_CONTENT_ADAPT_BRIGHTNESS	0x56
+#define ILI9488_CMD_WRITE_MIN_CAB_LEVEL			0x5E
+#define ILI9488_CMD_READ_MIN_CAB_LEVEL			0x5F
+#define ILI9488_CMD_READ_ABC_SELF_DIAG_RES		0x68
+#define ILI9488_CMD_READ_ID1				0xDA
+#define ILI9488_CMD_READ_ID2				0xDB
+#define ILI9488_CMD_READ_ID3				0xDC
 
-#define ILI9488_PGAMCTRL	0xe0
-#define ILI9488_NGAMCTRL	0xe1
-#define ILI9488_DTCTRLA		0xe8
-#define ILI9488_DTCTRLB		0xea
-#define ILI9488_PWRSEQ		0xed
+/* Level 2 Commands (from the display Datasheet) */
+#define ILI9488_CMD_INTERFACE_MODE_CONTROL		0xB0
+#define ILI9488_CMD_FRAME_RATE_CONTROL_NORMAL		0xB1
+#define ILI9488_CMD_FRAME_RATE_CONTROL_IDLE_8COLOR	0xB2
+#define ILI9488_CMD_FRAME_RATE_CONTROL_PARTIAL		0xB3
+#define ILI9488_CMD_DISPLAY_INVERSION_CONTROL		0xB4
+#define ILI9488_CMD_BLANKING_PORCH_CONTROL		0xB5
+#define ILI9488_CMD_DISPLAY_FUNCTION_CONTROL		0xB6
+#define ILI9488_CMD_ENTRY_MODE_SET			0xB7
+#define ILI9488_CMD_BACKLIGHT_CONTROL_1			0xB9
+#define ILI9488_CMD_BACKLIGHT_CONTROL_2			0xBA
+#define ILI9488_CMD_HS_LANES_CONTROL			0xBE
+#define ILI9488_CMD_POWER_CONTROL_1			0xC0
+#define ILI9488_CMD_POWER_CONTROL_2			0xC1
+#define ILI9488_CMD_POWER_CONTROL_NORMAL_3		0xC2
+#define ILI9488_CMD_POWER_CONTROL_IDEL_4		0xC3
+#define ILI9488_CMD_POWER_CONTROL_PARTIAL_5		0xC4
+#define ILI9488_CMD_VCOM_CONTROL_1			0xC5
+#define ILI9488_CMD_CABC_CONTROL_1			0xC6
+#define ILI9488_CMD_CABC_CONTROL_2			0xC8
+#define ILI9488_CMD_CABC_CONTROL_3			0xC9
+#define ILI9488_CMD_CABC_CONTROL_4			0xCA
+#define ILI9488_CMD_CABC_CONTROL_5			0xCB
+#define ILI9488_CMD_CABC_CONTROL_6			0xCC
+#define ILI9488_CMD_CABC_CONTROL_7			0xCD
+#define ILI9488_CMD_CABC_CONTROL_8			0xCE
+#define ILI9488_CMD_CABC_CONTROL_9			0xCF
+#define ILI9488_CMD_NVMEM_WRITE				0xD0
+#define ILI9488_CMD_NVMEM_PROTECTION_KEY		0xD1
+#define ILI9488_CMD_NVMEM_STATUS_READ			0xD2
+#define ILI9488_CMD_READ_ID4				0xD3
+#define ILI9488_CMD_ADJUST_CONTROL_1			0xD7
+#define ILI9488_CMD_READ_ID_VERSION			0xD8
+#define ILI9488_CMD_POSITIVE_GAMMA_CORRECTION		0xE0
+#define ILI9488_CMD_NEGATIVE_GAMMA_CORRECTION		0xE1
+#define ILI9488_CMD_DIGITAL_GAMMA_CONTROL_1		0xE2
+#define ILI9488_CMD_DIGITAL_GAMMA_CONTROL_2		0xE3
+#define ILI9488_CMD_SET_IMAGE_FUNCTION			0xE9
+#define ILI9488_CMD_ADJUST_CONTROL_2			0xF2
+#define ILI9488_CMD_ADJUST_CONTROL_3			0xF7
+#define ILI9488_CMD_ADJUST_CONTROL_4			0xF8
+#define ILI9488_CMD_ADJUST_CONTROL_5			0xF9
+#define ILI9488_CMD_SPI_READ_SETTINGS			0xFB
+#define ILI9488_CMD_ADJUST_CONTROL_6			0xFC
+#define ILI9488_CMD_ADJUST_CONTROL_7			0xFF
 
-#define ILI9488_EN3GAM		0xf2
-#define ILI9488_PUMPCTRL	0xf7
 
-#define ILI9488_MADCTL_BGR	BIT(3)
-#define ILI9488_MADCTL_MV	BIT(5)
-#define ILI9488_MADCTL_MX	BIT(6)
-#define ILI9488_MADCTL_MY	BIT(7)
+/*
+ * ILI9488 pixel format flags
+ *
+ * DBI is the pixel format of CPU interface
+ */
+#define ILI9488_DBI_BPP16               0x05    /* 16 bits / pixel */
+#define ILI9488_DBI_BPP18               0x06    /* 18 bits / pixel */
+#define ILI9488_DBI_BPP24               0x07    /* 24 bits / pixel */
+
+/*
+ * DPI is the pixel format select of RGB interface
+ */
+#define ILI9488_DPI_BPP16               0x50    /* 16 bits / pixel */
+#define ILI9488_DPI_BPP18               0x60    /* 18 bits / pixel */
+#define ILI9488_DPI_BPP24               0x70    /* 24 bits / pixel */
+
+/*
+ * ILI9488 Memory Access Control flags
+ */
+#define ILI9488_MY	BIT(7)		/* Row Address Order */
+#define ILI9488_MX	BIT(6)		/* Column Address Order */
+#define ILI9488_MV	BIT(5)		/* Row / Column Exchange */
+#define ILI9488_ML	BIT(4)		/* Vertical Refresh Order */
+#define ILI9488_BGR	BIT(3)		/* BGR Order, if set */
+#define ILI9488_MH	BIT(2)		/* Horizontal Refresh Order */
 
 static void ili9488_enable(struct drm_simple_display_pipe *pipe,
 			    struct drm_crtc_state *crtc_state,
@@ -69,45 +176,72 @@ static void ili9488_enable(struct drm_simple_display_pipe *pipe,
 
 	mipi_dbi_command(dbi, MIPI_DCS_SET_DISPLAY_OFF);
 
-	mipi_dbi_command(dbi, ILI9488_PWCTRLB, 0x00, 0x83, 0x30);
-	mipi_dbi_command(dbi, ILI9488_PWRSEQ, 0x64, 0x03, 0x12, 0x81);
-	mipi_dbi_command(dbi, ILI9488_DTCTRLA, 0x85, 0x01, 0x79);
-	mipi_dbi_command(dbi, ILI9488_PWCTRLA, 0x39, 0x2c, 0x00, 0x34, 0x02);
-	mipi_dbi_command(dbi, ILI9488_PUMPCTRL, 0x20);
-	mipi_dbi_command(dbi, ILI9488_DTCTRLB, 0x00, 0x00);
+	/* Positive Gamma Control */
+	mipi_dbi_command(dpi, ILI9488_CMD_POSITIVE_GAMMA_CORRECTION,
+			 0x00, 0x03, 0x09, 0x08, 0x16,
+			 0x0a, 0x3f, 0x78, 0x4c, 0x09,
+			 0x0a, 0x08, 0x16, 0x1a, 0x0f);
 
-	/* Power Control */
-	mipi_dbi_command(dbi, ILI9488_PWCTRL1, 0x26);
-	mipi_dbi_command(dbi, ILI9488_PWCTRL2, 0x11);
-	/* VCOM */
-	mipi_dbi_command(dbi, ILI9488_VMCTRL1, 0x35, 0x3e);
-	mipi_dbi_command(dbi, ILI9488_VMCTRL2, 0xbe);
+	/* Negative Gamma Control */
+	mipi_dbi_command(dpi, ILI9488_CMD_NEGATIVE_GAMMA_CORRECTION,
+			 0x00, 0x16, 0x19, 0x03, 0x0f,
+			 0x05, 0x32, 0x45, 0x46, 0x04,
+			 0x0e, 0x0d, 0x35, 0x37, 0x0f);
 
-	/* Memory Access Control */
-	mipi_dbi_command(dbi, MIPI_DCS_SET_PIXEL_FORMAT, MIPI_DCS_PIXEL_FMT_16BIT);
 
-	/* Frame Rate */
-	mipi_dbi_command(dbi, ILI9488_FRMCTR1, 0x00, 0x1b);
+	/* Power Control 1 */
+	mipi_dbi_command(dpi, ILI9488_CMD_POWER_CONTROL_1, 0x17, 0x15);
 
-	/* Gamma */
-	mipi_dbi_command(dbi, ILI9488_EN3GAM, 0x08);
-	mipi_dbi_command(dbi, MIPI_DCS_SET_GAMMA_CURVE, 0x01);
-	mipi_dbi_command(dbi, ILI9488_PGAMCTRL,
-		       0x1f, 0x1a, 0x18, 0x0a, 0x0f, 0x06, 0x45, 0x87,
-		       0x32, 0x0a, 0x07, 0x02, 0x07, 0x05, 0x00);
-	mipi_dbi_command(dbi, ILI9488_NGAMCTRL,
-		       0x00, 0x25, 0x27, 0x05, 0x10, 0x09, 0x3a, 0x78,
-		       0x4d, 0x05, 0x18, 0x0d, 0x38, 0x3a, 0x1f);
+	/* Power Control 2 */
+	mipi_dbi_command(dpi, ILI9488_CMD_POWER_CONTROL_2, 0x41);
 
-	/* DDRAM */
-	mipi_dbi_command(dbi, ILI9488_ETMOD, 0x07);
+	/* Power Control 3 (Normal mode) */
+	mipi_dbi_command(dpi, ILI9488_CMD_POWER_CONTROL_NORMAL_3, 0x44);
 
-	/* Display */
-	mipi_dbi_command(dbi, ILI9488_DISCTRL, 0x0a, 0x82, 0x27, 0x00);
-	mipi_dbi_command(dbi, MIPI_DCS_EXIT_SLEEP_MODE);
-	msleep(100);
 
-	mipi_dbi_command(dbi, MIPI_DCS_SET_DISPLAY_ON);
+	/* VCOM Control 1 */
+	mipi_dbi_command(dpi, ILI9488_CMD_VCOM_CONTROL_1, 0x00, 0x12, 0x80);
+
+
+	/* Pixel Format */
+	mipi_dbi_command(dpi, ILI9488_CMD_COLMOD_PIXEL_FORMAT_SET,
+			 ILI9488_DBI_BPP18 | ILI9488_DPI_BPP18);
+
+
+	mipi_dbi_command(dpi, ILI9488_CMD_INTERFACE_MODE_CONTROL, 0x80);
+
+
+	/* Frame Rate Control */
+	/*	Frame rate = 60.76Hz.*/
+	mipi_dbi_command(dpi, ILI9488_CMD_FRAME_RATE_CONTROL_NORMAL, 0xa0);
+
+
+	/* Display Inversion Control */
+	/*	2 dot inversion */
+	mipi_dbi_command(dpi, ILI9488_CMD_DISPLAY_INVERSION_CONTROL, 0x02);
+
+
+	/* Set Image Function */
+	mipi_dbi_command(dpi, ILI9488_CMD_SET_IMAGE_FUNCTION, 0x00);
+
+
+	/* Adjust Control 3 */
+	mipi_dbi_command(dpi, ILI9488_CMD_ADJUST_CONTROL_3,
+			 0xa9, 0x51, 0x2c, 0x82);
+
+	/* CABC control 2 */
+	mipi_dbi_command(dpi, ILI9488_CMD_CABC_CONTROL_2, 0xb0);
+
+
+	/* Sleep OUT */
+	mipi_dbi_command(dpi, ILI9488_CMD_SLEEP_OUT);
+
+	msleep(120);
+
+	mipi_dbi_command(dpi, ILI9488_CMD_NORMAL_DISP_MODE_ON);
+
+	/* Display ON */
+	mipi_dbi_command(dpi, ILI9488_CMD_DISPLAY_ON);
 	msleep(100);
 
 out_enable:
@@ -118,18 +252,18 @@ out_enable:
 	 * regardless of the display "on/off" state.
 	 */
 	switch (dbidev->rotation) {
-	default:
-		addr_mode = ILI9488_MADCTL_MV | ILI9488_MADCTL_MY |
-			    ILI9488_MADCTL_MX;
-		break;
-	case 90:
-		addr_mode = ILI9488_MADCTL_MY;
+	case 270:
+		addr_mode = ( ILI9488_MX | ILI9488_MY | ILI9488_MV | ILI9488_ML );
 		break;
 	case 180:
-		addr_mode = ILI9488_MADCTL_MV;
+		addr_mode = ( ILI9488_MY | ILI9488_ML );
 		break;
-	case 270:
-		addr_mode = ILI9488_MADCTL_MX;
+	case 90:
+		addr_mode = ILI9488_MV;
+		break;
+	case 0:
+	default:
+		addr_mode = ILI9488_MX;
 		break;
 	}
 	addr_mode |= ILI9488_MADCTL_BGR;
