@@ -28,6 +28,16 @@ dtparam=speed=32000000
 dtparam=rotation=0
 ~~~~
 
+## config.txt
+### makerlabtft35
+~~~~
+dtoverlay=makerlabtft35-capacitive
+dtparam=speed=62000000
+dtparam=fps=60
+dtparam=touch-swapxy=true
+dtparam=touch-invx=true
+~~~~
+
 ### makerlabtft40-resistive
 ~~~~
 dtoverlay=makerlabtft40-resistive
