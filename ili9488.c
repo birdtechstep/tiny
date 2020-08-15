@@ -76,6 +76,7 @@
 
 static const uint32_t ili9488_formats[] = {
 	DRM_FORMAT_RGB565,
+	DRM_FORMAT_XRGB8888,
 };
 
 static void ili9488_rgb565_to_rgb666_line(u8 *dst, u16 *sbuf,
@@ -119,6 +120,35 @@ static void ili9488_rgb565_to_rgb666(u8 *dst, void *vaddr,
 	kfree(sbuf);
 }
 
+static void ili9488_xrgb8888_to_rgb666(u8 *dst, void *vaddr,
+					struct drm_framebuffer *fb,
+					struct drm_rect *clip)
+{
+	size_t len = (clip->x2 - clip->x1) * sizeof(u32);
+	unsigned int x, y;
+	u32 *src, *buf;
+
+	buf = kmalloc(len, GFP_KERNEL);
+	if (!buf)
+		return;
+
+	for (y = clip->y1; y < clip->y2; y++) {
+		src = vaddr + (y * fb->pitches[0]);
+		src += clip->x1;
+		memcpy(buf, src, len);
+		src = buf;
+		for (x = clip->x1; x < clip->x2; x++) {
+			*dst++ = ((*src & 0x00FC0000) >> 16);
+			*dst++ = ((*src & 0x0000FC00) >> 8);
+			*dst++ = ((*src & 0x000000FC));
+			src++;
+		}
+	}
+
+	kfree(buf);
+}
+
+
 static int ili9488_buf_copy(void *dst, struct drm_framebuffer *fb,
 			    struct drm_rect *rect)
 {
@@ -139,6 +169,9 @@ static int ili9488_buf_copy(void *dst, struct drm_framebuffer *fb,
 	case DRM_FORMAT_RGB565:
 		ili9488_rgb565_to_rgb666(dst, src, fb, rect);
 		break;
+ 	case DRM_FORMAT_XRGB8888:
+                ili9488_xrgb8888_to_rgb666(dst, src, fb, rect);
+                break;
 	default:
 		dev_err_once(fb->dev->dev, "Format is not supported: %s\n",
 			     drm_get_format_name(fb->format->format,
@@ -179,7 +212,7 @@ static void ili9488_fb_dirty(struct drm_framebuffer *fb, struct drm_rect *rect)
 	 * only RGB666 format which is not implemented in DRM
 	 */
 	if (!dbi->dc || !full ||
-	    fb->format->format == DRM_FORMAT_RGB565) {
+	    fb->format->format == DRM_FORMAT_XRGB8888) {
 		tr = dbidev->tx_buf;
 		ret = ili9488_buf_copy(dbidev->tx_buf, fb, rect);
 		if (ret)
@@ -255,13 +288,6 @@ static void ili9488_enable(struct drm_simple_display_pipe *pipe,
 	struct mipi_dbi *dbi = &dbidev->dbi;
 	u8 addr_mode;
 	int ret, idx;
-	//struct drm_framebuffer *fb = plane_state->fb;
-	//struct drm_rect rect = {
-	//	.x1 = 0,
-	//	.x2 = fb->width,
-	//	.y1 = 0,
-	//	.y2 = fb->height,
-	//};
 
 	if (!drm_dev_enter(pipe->crtc.dev, &idx))
 		return;
@@ -459,7 +485,7 @@ static int ili9488_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
-	dbidev->drm.mode_config.preferred_depth = 16;
+	//dbidev->drm.mode_config.preferred_depth = 16;
 
 	//ret = mipi_dbi_dev_init(dbidev, &ili9488_pipe_funcs, &ili9488_mode, rotation);
 	ret = mipi_dbi_dev_init_with_formats(dbidev, &ili9488_pipe_funcs,
