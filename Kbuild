@@ -10,3 +10,4 @@ obj-m	+= st7586.o
 obj-m	+= st7735r.o
 obj-m	+= st7789v.o
 obj-m	+= st7796.o
+obj-m += ili9488.o
