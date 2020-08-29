@@ -48,6 +48,7 @@
                                 pinctrl-0 = <&pitft_pins>;
 
                                 spi-max-frequency = <128000000>;
+				txbuflen = <49152>;
                                 rotation = <90>;
                                 fps = <60>;
                                 bgr;
@@ -93,6 +94,7 @@
 
         __overrides__ {
                 speed =   <&pitft>,"spi-max-frequency:0";
+		txbuflen = <&pitft>,"txbuflen:0";
                 rotation =  <&pitft>,"rotation:0";
                 fps =     <&pitft>,"fps:0";
                 debug =   <&pitft>,"debug:0";
