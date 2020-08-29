@@ -11,6 +11,10 @@ chmod +x dtc.sh
 ~~~~
 sudo dtc -@ -I dts -O dtb -o /boot/overlays/makerlabtft154.dtbo makerlabtft154-overlay.dts
 ~~~~
+### makerlabtft35-capacitive
+~~~~
+sudo dtc -@ -I dts -O dtb -o /boot/overlays/makerlabtft35-capacitive.dtbo makerlabtft35-capacitive-overlay.dts
+~~~~
 ### makerlabtft40-resistive
 ~~~~
 sudo dtc -@ -I dts -O dtb -o /boot/overlays/makerlabtft40-resistive.dtbo makerlabtft40-resistive-overlay.dts
@@ -34,6 +38,7 @@ dtparam=rotation=0
 dtoverlay=makerlabtft35-capacitive
 dtparam=speed=62000000
 dtparam=fps=60
+dtparam=rotation=90
 dtparam=touch-swapxy=true
 dtparam=touch-invx=true
 ~~~~
