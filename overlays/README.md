@@ -37,7 +37,7 @@ dtparam=rotation=0
 ~~~~
 dtoverlay=makerlabtft35-capacitive
 dtparam=speed=62000000
-dtparam=txbuflen-32768
+dtparam=txbuflen=49152
 dtparam=fps=60
 dtparam=rotation=90
 dtparam=touch-swapxy=true
