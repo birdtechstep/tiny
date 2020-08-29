@@ -20,11 +20,11 @@ sudo dtc -@ -I dts -O dtb -o /boot/overlays/makerlabtft35-capacitive.dtbo makerl
 sudo dtc -@ -I dts -O dtb -o /boot/overlays/makerlabtft40-resistive.dtbo makerlabtft40-resistive-overlay.dts
 ~~~~
 
-## cmdline.txt
+## add this in cmdline.txt [sudo nano /boot/cmdline.txt]
 ~~~~
 fbcon=map:10 fbcon=font:VGA8x16
 ~~~~
-## config.txt
+## add line in config.txt [sudo nano /boot/config.txt]
 ### makerlabtft154
 ~~~~
 dtoverlay=makerlabtft154
@@ -33,7 +33,7 @@ dtparam=rotation=0
 ~~~~
 
 ## config.txt
-### makerlabtft35
+### makerlabtft35-capacitive
 ~~~~
 dtoverlay=makerlabtft35-capacitive
 dtparam=speed=62000000
