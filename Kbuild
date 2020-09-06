@@ -1,6 +1,6 @@
 ccflags-y := -I$(src)/include
 
-obj-m	+= gm12u320.o
+#obj-m	+= gm12u320.o
 obj-m	+= hx8357d.o
 obj-m	+= ili9225.o
 obj-m	+= ili9341.o
